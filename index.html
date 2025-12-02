@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TextBase | Snippet Manager</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+body { font-family: 'Inter', sans-serif; background-color: #f0f4f7; }
+.evernote-green { background-color: #38a169; }
+.evernote-green-hover:hover { background-color: #276749; }
+.snippet-list-item:hover { background-color: #f7f9fb; }
+</style>
+</head>
+<body class="overflow-hidden">
+
+<!-- Name setup modal -->
+<div id="setup-modal" class="fixed inset-0 bg-gray-900 bg-opacity-75 z-50 flex items-center justify-center">
+  <div class="bg-white p-8 rounded-xl shadow-2xl max-w-sm w-full text-center">
+    <h2 class="text-3xl font-bold mb-4">Welcome to TextBase!</h2>
+    <input id="username-input" type="text" placeholder="Your Name" class="w-full p-3 border rounded-lg mb-4">
+    <button id="start-btn" class="w-full py-3 text-white font-semibold rounded-lg evernote-green evernote-green-hover">Start</button>
+  </div>
+</div>
+
+<!-- Main app wrapper -->
+<div id="app-wrapper" class="h-screen w-full flex flex-col hidden">
+
+  <!-- Top bar -->
+  <header class="h-16 flex items-center px-6 bg-white shadow-sm border-b border-gray-200 justify-between">
+    <button id="open-sidebar" class="text-gray-600 hover:text-green-600 mr-4">
+      ☰
+    </button>
+    <h1 class="text-xl font-semibold text-gray-800">TextBase</h1>
+  </header>
+
+  <div class="flex flex-grow overflow-hidden">
+    <!-- Sidebar -->
+    <div id="sidebar" class="fixed top-0 left-0 h-full w-64 bg-white shadow-2xl z-40 p-6 transform -translate-x-full transition-transform">
+      <nav class="flex flex-col space-y-2">
+        <button data-page="home" class="p-2 rounded hover:bg-green-100">Home</button>
+        <button data-page="add" class="p-2 rounded hover:bg-green-100">Add Snippet</button>
+        <button data-page="view" class="p-2 rounded hover:bg-green-100">View Snippets</button>
+        <button data-page="profile" class="p-2 rounded hover:bg-green-100">Profile</button>
+      </nav>
+    </div>
+    <div id="sidebar-overlay" class="fixed inset-0 bg-gray-900 bg-opacity-50 hidden"></div>
+
+    <!-- Content -->
+    <main class="flex-grow overflow-y-auto p-6">
+      <!-- Home -->
+      <div id="home-view" class="space-y-6">
+        <h2 class="text-4xl font-bold text-green-600">TextBase</h2>
+        <p class="text-xl">Let's jump in, <span id="welcome-user-name"></span>.</p>
+        <div class="flex space-x-4">
+          <button data-page="add" class="p-4 bg-green-500 hover:bg-green-600 text-white rounded-xl">Add Snippet</button>
+          <button data-page="view" class="p-4 bg-gray-200 hover:bg-gray-300 rounded-xl">View Snippets</button>
+          <button data-page="profile" class="p-4 bg-gray-700 hover:bg-gray-800 text-white rounded-xl">Profile</button>
+        </div>
+      </div>
+
+      <!-- Add Snippet -->
+      <div id="add-view" class="hidden space-y-4">
+        <h2 class="text-2xl font-semibold">Add New Snippet</h2>
+        <input type="text" id="snippet-title" placeholder="Title" class="w-full p-2 border rounded-lg">
+        <textarea id="snippet-content" rows="6" placeholder="Content" class="w-full p-2 border rounded-lg"></textarea>
+        <button id="save-snippet" class="py-2 px-4 bg-green-500 hover:bg-green-600 text-white rounded-lg">Save Snippet</button>
+      </div>
+
+      <!-- View Snippets -->
+      <div id="view-view" class="hidden space-y-2">
+        <h2 class="text-2xl font-semibold mb-4">Your Snippets</h2>
+        <div id="snippets-list" class="space-y-2"></div>
+      </div>
+
+      <!-- Profile -->
+      <div id="profile-view" class="hidden space-y-4">
+        <h2 class="text-2xl font-semibold">Profile</h2>
+        <p>Current User: <span id="profile-user-name"></span></p>
+        <button id="logout-btn" class="py-2 px-4 bg-red-500 hover:bg-red-600 text-white rounded-lg">Change User</button>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<script>
+// Elements
+const setupModal = document.getElementById('setup-modal');
+const startBtn = document.getElementById('start-btn');
+const usernameInput = document.getElementById('username-input');
+const appWrapper = document.getElementById('app-wrapper');
+const welcomeName = document.getElementById('welcome-user-name');
+const profileName = document.getElementById('profile-user-name');
+const sidebar = document.getElementById('sidebar');
+const sidebarOverlay = document.getElementById('sidebar-overlay');
+const openSidebar = document.getElementById('open-sidebar');
+
+let activeUser = localStorage.getItem('TextBaseUser');
+let snippets = JSON.parse(localStorage.getItem('TextBaseSnippets')) || [];
+
+// Setup modal
+function initApp() {
+  if(!activeUser) {
+    setupModal.style.display = 'flex';
+    appWrapper.classList.add('hidden');
+  } else {
+    setupModal.style.display = 'none';
+    appWrapper.classList.remove('hidden');
+    welcomeName.textContent = activeUser;
+    profileName.textContent = activeUser;
+    showPage('home');
+    renderSnippets();
+  }
+}
+
+startBtn.addEventListener('click', () => {
+  const name = usernameInput.value.trim();
+  if(!name) return alert('Enter a name');
+  localStorage.setItem('TextBaseUser', name);
+  activeUser = name;
+  initApp();
+});
+
+// Navigation
+function showPage(page) {
+  ['home','add','view','profile'].forEach(p => {
+    document.getElementById(p+'-view').classList.add('hidden');
+  });
+  document.getElementById(page+'-view').classList.remove('hidden');
+  sidebar.classList.add('-translate-x-full');
+  sidebarOverlay.classList.add('hidden');
+}
+
+// Sidebar toggle
+openSidebar.addEventListener('click', ()=>{ sidebar.classList.remove('-translate-x-full'); sidebarOverlay.classList.remove('hidden'); });
+sidebarOverlay.addEventListener('click', ()=>{ sidebar.classList.add('-translate-x-full'); sidebarOverlay.classList.add('hidden'); });
+
+// Sidebar buttons
+document.querySelectorAll('#sidebar button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{ showPage(btn.getAttribute('data-page')); });
+});
+document.querySelectorAll('[data-page]').forEach(btn=>{
+  btn.addEventListener('click', ()=>{ showPage(btn.getAttribute('data-page')); });
+});
+
+// Logout
+document.getElementById('logout-btn').addEventListener('click', ()=>{
+  localStorage.removeItem('TextBaseUser');
+  initApp();
+});
+
+// Snippet handling
+const saveBtn = document.getElementById('save-snippet');
+const titleInput = document.getElementById('snippet-title');
+const contentInput = document.getElementById('snippet-content');
+const listDiv = document.getElementById('snippets-list');
+
+function renderSnippets() {
+  listDiv.innerHTML = '';
+  snippets.forEach((s,i)=>{
+    const div = document.createElement('div');
+    div.className = 'p-2 bg-green-100 rounded';
+    div.innerHTML = `<strong>${s.title}</strong><p>${s.content}</p>
+    <button onclick="deleteSnippet(${i})" class="mt-1 py-1 px-2 bg-red-500 hover:bg-red-600 text-white rounded">Delete</button>`;
+    listDiv.appendChild(div);
+  });
+}
+
+saveBtn.addEventListener('click', ()=>{
+  const t = titleInput.value.trim();
+  const c = contentInput.value.trim();
+  if(!t||!c) return alert('Title and content required');
+  snippets.push({title:t, content:c});
+  localStorage.setItem('TextBaseSnippets', JSON.stringify(snippets));
+  titleInput.value = ''; contentInput.value = '';
+  renderSnippets();
+  showPage('view');
+});
+
+function deleteSnippet(index){
+  snippets.splice(index,1);
+  localStorage.setItem('TextBaseSnippets', JSON.stringify(snippets));
+  renderSnippets();
+}
+
+// Initialize
+initApp();
+</script>
+
+</body>
+</html>
